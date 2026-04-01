@@ -130,11 +130,45 @@ button:disabled {
 	font-weight: 600;
 }
 
+.timer-critical {
+	color: #b42318;
+}
+
 .options-grid {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 10px;
 	margin-bottom: 14px;
+}
+
+.custom-bid-wrap {
+	padding: 12px;
+	border: 1px solid #e3ecfa;
+	border-radius: 12px;
+	margin-bottom: 14px;
+	background: #f7fbff;
+}
+
+.custom-bid-input {
+	width: 100%;
+	padding: 10px 12px;
+	margin-top: 6px;
+	border-radius: 10px;
+	border: 1px solid #b9cbe4;
+	font-size: 1rem;
+}
+
+.custom-bid-help {
+	margin: 8px 0 0;
+	font-size: 0.88rem;
+	color: #455d78;
+}
+
+.custom-bid-error {
+	margin: 6px 0 0;
+	font-size: 0.88rem;
+	color: #a32121;
+	font-weight: 600;
 }
 
 .price-tag {

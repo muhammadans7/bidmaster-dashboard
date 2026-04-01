@@ -9,11 +9,22 @@ function BidScreen() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [notice, setNotice] = useState("");
+	const [nowMs, setNowMs] = useState(Date.now());
 
 	const hasActivePlayer = Boolean(state?.current_player);
 
 	useEffect(() => {
 		void loadState();
+	}, []);
+
+	useEffect(() => {
+		const timerId = window.setInterval(() => {
+			setNowMs(Date.now());
+		}, 1000);
+
+		return () => {
+			window.clearInterval(timerId);
+		};
 	}, []);
 
 	async function loadState() {
@@ -106,11 +117,26 @@ function BidScreen() {
 		if (!state?.current_player) {
 			return "No active bid window";
 		}
-		if (state.bid_window_remaining_seconds === 0) {
+
+		const windowEndMs = state.bid_window_ends_at ? new Date(state.bid_window_ends_at).getTime() : null;
+		const remaining =
+			windowEndMs == null ? 0 : Math.max(0, Math.ceil((windowEndMs - nowMs) / 1000));
+		const total = state.bid_window_seconds ?? 0;
+		const remainingFormatted = String(remaining).padStart(2, "0");
+		const totalFormatted = String(total).padStart(2, "0");
+
+		if (remaining === 0) {
 			return "Bid window ended. Close current player to move next.";
 		}
-		return `Bid window: ${state.bid_window_remaining_seconds}s / ${state.bid_window_seconds}s`;
-	}, [state]);
+
+		return `Bid window: 00:${remainingFormatted} / 00:${totalFormatted}`;
+	}, [state, nowMs]);
+
+	const timerCritical = Boolean(
+		state?.current_player &&
+			state.bid_window_ends_at &&
+			Math.max(0, Math.ceil((new Date(state.bid_window_ends_at).getTime() - nowMs) / 1000)) <= 5,
+	);
 
 	return (
 		<main className="page">
@@ -119,7 +145,7 @@ function BidScreen() {
 					<p className="label">Sports Week Auction</p>
 					<h1>Live Bidding Dashboard</h1>
 					<p>{queueInfo}</p>
-					<p className="timer-copy">{timerInfo}</p>
+					<p className={`timer-copy ${timerCritical ? "timer-critical" : ""}`}>{timerInfo}</p>
 					<p>{summary}</p>
 				</div>
 				<div className="header-actions">
@@ -141,6 +167,7 @@ function BidScreen() {
 					<BidOptions
 						teams={state.teams}
 						bidOptions={state.bid_options}
+						minIncrement={state.min_increment}
 						onBid={handleBid}
 						loading={loading}
 						disabled={!hasActivePlayer}

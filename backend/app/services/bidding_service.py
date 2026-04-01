@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from math import floor
 from threading import RLock
 
@@ -15,7 +15,7 @@ TEAM_MIN_PLAYERS = 10
 TEAM_MAX_PLAYERS = 12
 BASE_PRICE = 30_000
 MIN_INCREMENT = 5_000
-BID_WINDOW_SECONDS = 30
+BID_WINDOW_SECONDS = 60
 
 
 @dataclass(frozen=True)
@@ -149,6 +149,12 @@ class BiddingService:
 		remaining = BID_WINDOW_SECONDS - floor(elapsed)
 		return max(0, remaining)
 
+	def _bid_window_ends_at(self) -> str | None:
+		if self._state.player is None or self._state.player_started_at is None:
+			return None
+		window_end = self._state.player_started_at + timedelta(seconds=BID_WINDOW_SECONDS)
+		return window_end.isoformat()
+
 	def _bid_window_closed(self) -> bool:
 		remaining = self._bid_window_remaining_seconds()
 		return remaining == 0 if remaining is not None else False
@@ -175,6 +181,7 @@ class BiddingService:
 				min_increment=MIN_INCREMENT,
 				bid_window_seconds=BID_WINDOW_SECONDS,
 				bid_window_remaining_seconds=self._bid_window_remaining_seconds(),
+				bid_window_ends_at=self._bid_window_ends_at(),
 				squad_min_players=TEAM_MIN_PLAYERS,
 				squad_max_players=TEAM_MAX_PLAYERS,
 				bid_options=self._next_bid_options(),
@@ -222,7 +229,9 @@ class BiddingService:
 				raise ValueError("No active player left to bid on")
 
 			if self._bid_window_closed():
-				raise ValueError("30-second bid window ended. Close current player to move next")
+				raise ValueError(
+					f"{BID_WINDOW_SECONDS}-second bid window ended. Close current player to move next"
+				)
 
 			team = self._teams[normalized_team]
 			if team.squad_size >= TEAM_MAX_PLAYERS:

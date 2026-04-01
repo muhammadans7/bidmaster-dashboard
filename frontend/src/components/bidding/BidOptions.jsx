@@ -1,21 +1,53 @@
-function BidOptions({ teams, bidOptions, onBid, loading, disabled, squadMaxPlayers }) {
+import { useMemo, useState } from "react";
+
+function BidOptions({ teams, bidOptions, onBid, loading, disabled, squadMaxPlayers, minIncrement }) {
+	const [customAmount, setCustomAmount] = useState("");
+
+	const minimumBid = bidOptions[0] ?? 0;
+	const parsedAmount = useMemo(() => Number.parseInt(customAmount, 10), [customAmount]);
+	const hasValidNumber = Number.isFinite(parsedAmount) && parsedAmount > 0;
+	const hasMinimumError = hasValidNumber && parsedAmount < minimumBid;
+	const hasIncrementError = hasValidNumber && parsedAmount % minIncrement !== 0;
+	const hasAmountError = !hasValidNumber || hasMinimumError || hasIncrementError;
+
+	function handleCustomBid(teamName) {
+		if (hasAmountError) {
+			return;
+		}
+		onBid(teamName, parsedAmount);
+	}
+
 	return (
 		<section className="card bid-card">
 			<h3>Team Bidding Controls</h3>
-			<p className="hint">Pick one amount, then click the team to place bid.</p>
+			<p className="hint">Host can type any amount and place bid for any team.</p>
 
-			<div className="options-grid">
-				{bidOptions.map((amount) => (
-					<button
-						key={amount}
-						className="price-tag"
-						type="button"
-						onClick={() => onBid(null, amount)}
-						disabled={disabled || loading}
-					>
-						PKR {amount.toLocaleString()}
-					</button>
-				))}
+			<div className="custom-bid-wrap">
+				<label htmlFor="custom-amount" className="label">
+					Bid Amount (PKR)
+				</label>
+				<input
+					id="custom-amount"
+					type="number"
+					className="custom-bid-input"
+					min={minimumBid || 0}
+					step={minIncrement}
+					placeholder="Enter amount"
+					value={customAmount}
+					onChange={(event) => setCustomAmount(event.target.value)}
+					disabled={disabled || loading}
+				/>
+				<p className="custom-bid-help">
+					Minimum: PKR {minimumBid.toLocaleString()} | Increment: PKR {minIncrement.toLocaleString()}
+				</p>
+				{hasMinimumError ? (
+					<p className="custom-bid-error">Amount must be at least PKR {minimumBid.toLocaleString()}.</p>
+				) : null}
+				{hasIncrementError ? (
+					<p className="custom-bid-error">
+						Amount must be in PKR {minIncrement.toLocaleString()} increments.
+					</p>
+				) : null}
 			</div>
 
 			<div className="team-grid">
@@ -30,17 +62,14 @@ function BidOptions({ teams, bidOptions, onBid, loading, disabled, squadMaxPlaye
 							<p className="team-full">Squad limit reached</p>
 						) : null}
 						<div className="team-actions">
-							{bidOptions.map((amount) => (
-								<button
-									key={`${team.name}-${amount}`}
-									type="button"
-									className="team-bid-btn"
-									onClick={() => onBid(team.name, amount)}
-									disabled={disabled || loading || team.squad_size >= squadMaxPlayers}
-								>
-									Bid {amount.toLocaleString()}
-								</button>
-							))}
+							<button
+								type="button"
+								className="team-bid-btn"
+								onClick={() => handleCustomBid(team.name)}
+								disabled={disabled || loading || team.squad_size >= squadMaxPlayers || hasAmountError}
+							>
+								Place Bid
+							</button>
 						</div>
 					</div>
 				))}
