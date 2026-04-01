@@ -99,10 +99,14 @@ button:disabled {
 
 .player-card h2 {
 	margin: 6px 0;
+	font-size: clamp(2rem, 4vw, 3rem);
+	line-height: 1.1;
 }
 
 .base-price {
-	font-weight: 600;
+	font-size: clamp(1.6rem, 3vw, 2.3rem);
+	font-weight: 800;
+	margin: 14px 0;
 	color: #0a5f37;
 }
 

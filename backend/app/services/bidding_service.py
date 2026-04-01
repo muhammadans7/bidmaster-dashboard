@@ -15,7 +15,7 @@ TEAM_MIN_PLAYERS = 10
 TEAM_MAX_PLAYERS = 12
 BASE_PRICE = 30_000
 MIN_INCREMENT = 5_000
-BID_WINDOW_SECONDS = 60
+BID_WINDOW_SECONDS = 40
 
 
 @dataclass(frozen=True)
@@ -256,14 +256,16 @@ class BiddingService:
 			if team.remaining_purse < amount:
 				raise ValueError(f"{team.name} does not have enough purse for this bid")
 
+			now = datetime.now(timezone.utc)
 			self._state.current_bid = amount
 			self._state.leading_team = team.name
+			self._state.player_started_at = now
 			self._state.recent_bids.insert(
 				0,
 				BidEventOut(
 					team_name=team.name,
 					amount=amount,
-					timestamp=datetime.now(timezone.utc).isoformat(),
+					timestamp=now.isoformat(),
 				),
 			)
 			self._state.recent_bids = self._state.recent_bids[:10]

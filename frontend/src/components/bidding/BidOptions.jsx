@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 function BidOptions({ teams, bidOptions, onBid, loading, disabled, squadMaxPlayers, minIncrement }) {
 	const [customAmount, setCustomAmount] = useState("");
+	const [showAmountError, setShowAmountError] = useState(false);
 
 	const minimumBid = bidOptions[0] ?? 0;
 	const parsedAmount = useMemo(() => Number.parseInt(customAmount, 10), [customAmount]);
@@ -10,11 +11,22 @@ function BidOptions({ teams, bidOptions, onBid, loading, disabled, squadMaxPlaye
 	const hasIncrementError = hasValidNumber && parsedAmount % minIncrement !== 0;
 	const hasAmountError = !hasValidNumber || hasMinimumError || hasIncrementError;
 
+	const showMinimumError = showAmountError && hasMinimumError;
+	const showIncrementError = showAmountError && hasIncrementError;
+	const showInvalidNumberError = showAmountError && !hasValidNumber;
+
 	function handleCustomBid(teamName) {
 		if (hasAmountError) {
+			setShowAmountError(true);
 			return;
 		}
+		setShowAmountError(false);
 		onBid(teamName, parsedAmount);
+	}
+
+	function handleAmountChange(event) {
+		setCustomAmount(event.target.value);
+		setShowAmountError(false);
 	}
 
 	return (
@@ -34,16 +46,19 @@ function BidOptions({ teams, bidOptions, onBid, loading, disabled, squadMaxPlaye
 					step={minIncrement}
 					placeholder="Enter amount"
 					value={customAmount}
-					onChange={(event) => setCustomAmount(event.target.value)}
+					onChange={handleAmountChange}
 					disabled={disabled || loading}
 				/>
 				<p className="custom-bid-help">
 					Minimum: PKR {minimumBid.toLocaleString()} | Increment: PKR {minIncrement.toLocaleString()}
 				</p>
-				{hasMinimumError ? (
+				{showInvalidNumberError ? (
+					<p className="custom-bid-error">Enter a valid bid amount first.</p>
+				) : null}
+				{showMinimumError ? (
 					<p className="custom-bid-error">Amount must be at least PKR {minimumBid.toLocaleString()}.</p>
 				) : null}
-				{hasIncrementError ? (
+				{showIncrementError ? (
 					<p className="custom-bid-error">
 						Amount must be in PKR {minIncrement.toLocaleString()} increments.
 					</p>

@@ -9,7 +9,7 @@ function BidScreen() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [notice, setNotice] = useState("");
-	const [nowMs, setNowMs] = useState(Date.now());
+	const [displayRemainingSeconds, setDisplayRemainingSeconds] = useState(0);
 
 	const hasActivePlayer = Boolean(state?.current_player);
 
@@ -18,14 +18,26 @@ function BidScreen() {
 	}, []);
 
 	useEffect(() => {
+		if (!state?.current_player || state.bid_window_remaining_seconds == null) {
+			setDisplayRemainingSeconds(0);
+			return;
+		}
+		setDisplayRemainingSeconds(state.bid_window_remaining_seconds);
+	}, [state?.current_player?.id, state?.bid_window_remaining_seconds, state?.bid_window_ends_at]);
+
+	useEffect(() => {
+		if (!state?.current_player) {
+			return undefined;
+		}
+
 		const timerId = window.setInterval(() => {
-			setNowMs(Date.now());
+			setDisplayRemainingSeconds((previous) => (previous > 0 ? previous - 1 : 0));
 		}, 1000);
 
 		return () => {
 			window.clearInterval(timerId);
 		};
-	}, []);
+	}, [state?.current_player?.id]);
 
 	async function loadState() {
 		setLoading(true);
@@ -118,9 +130,7 @@ function BidScreen() {
 			return "No active bid window";
 		}
 
-		const windowEndMs = state.bid_window_ends_at ? new Date(state.bid_window_ends_at).getTime() : null;
-		const remaining =
-			windowEndMs == null ? 0 : Math.max(0, Math.ceil((windowEndMs - nowMs) / 1000));
+		const remaining = displayRemainingSeconds;
 		const total = state.bid_window_seconds ?? 0;
 		const remainingFormatted = String(remaining).padStart(2, "0");
 		const totalFormatted = String(total).padStart(2, "0");
@@ -130,12 +140,11 @@ function BidScreen() {
 		}
 
 		return `Bid window: 00:${remainingFormatted} / 00:${totalFormatted}`;
-	}, [state, nowMs]);
+	}, [state, displayRemainingSeconds]);
 
 	const timerCritical = Boolean(
 		state?.current_player &&
-			state.bid_window_ends_at &&
-			Math.max(0, Math.ceil((new Date(state.bid_window_ends_at).getTime() - nowMs) / 1000)) <= 5,
+			displayRemainingSeconds <= 5,
 	);
 
 	return (
