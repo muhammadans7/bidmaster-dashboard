@@ -94,6 +94,8 @@ class TeamState:
 class AuctionState:
 	player: PlayerOut | None = None
 	player_started_at: datetime | None = None
+	timer_paused: bool = False
+	paused_remaining_seconds: int | None = None
 	current_bid: int | None = None
 	leading_team: str | None = None
 	recent_bids: list[BidEventOut] = field(default_factory=list)
@@ -142,7 +144,15 @@ class BiddingService:
 		return self._player_index + 1
 
 	def _bid_window_remaining_seconds(self) -> int | None:
-		if self._state.player is None or self._state.player_started_at is None:
+		if self._state.player is None:
+			return None
+
+		if self._state.timer_paused:
+			if self._state.paused_remaining_seconds is None:
+				return BID_WINDOW_SECONDS
+			return self._state.paused_remaining_seconds
+
+		if self._state.player_started_at is None:
 			return None
 
 		elapsed = (datetime.now(timezone.utc) - self._state.player_started_at).total_seconds()
@@ -150,7 +160,7 @@ class BiddingService:
 		return max(0, remaining)
 
 	def _bid_window_ends_at(self) -> str | None:
-		if self._state.player is None or self._state.player_started_at is None:
+		if self._state.player is None or self._state.player_started_at is None or self._state.timer_paused:
 			return None
 		window_end = self._state.player_started_at + timedelta(seconds=BID_WINDOW_SECONDS)
 		return window_end.isoformat()
@@ -182,6 +192,7 @@ class BiddingService:
 				bid_window_seconds=BID_WINDOW_SECONDS,
 				bid_window_remaining_seconds=self._bid_window_remaining_seconds(),
 				bid_window_ends_at=self._bid_window_ends_at(),
+				bid_timer_paused=self._state.timer_paused,
 				squad_min_players=TEAM_MIN_PLAYERS,
 				squad_max_players=TEAM_MAX_PLAYERS,
 				bid_options=self._next_bid_options(),
@@ -193,7 +204,12 @@ class BiddingService:
 	def _set_active_player(self) -> None:
 		current_player = self._current_player()
 		started_at = datetime.now(timezone.utc) if current_player is not None else None
-		self._state = AuctionState(player=current_player, player_started_at=started_at)
+		self._state = AuctionState(
+			player=current_player,
+			player_started_at=started_at,
+			timer_paused=False,
+			paused_remaining_seconds=None,
+		)
 
 	def _queue_finished_message(self) -> str:
 		short_teams = [
@@ -219,6 +235,40 @@ class BiddingService:
 			self._set_active_player()
 			return self.get_state(message="Auction reset")
 
+	def pause_timer(self) -> AuctionStateOut:
+		with self._lock:
+			if self._state.player is None:
+				raise ValueError("No active player left to pause")
+
+			if self._state.timer_paused:
+				return self.get_state(message="Bid timer already paused")
+
+			remaining = self._bid_window_remaining_seconds()
+			if remaining is None:
+				remaining = BID_WINDOW_SECONDS
+
+			self._state.timer_paused = True
+			self._state.paused_remaining_seconds = remaining
+			return self.get_state(message="Bid timer paused")
+
+	def resume_timer(self) -> AuctionStateOut:
+		with self._lock:
+			if self._state.player is None:
+				raise ValueError("No active player left to resume")
+
+			if not self._state.timer_paused:
+				return self.get_state(message="Bid timer already running")
+
+			remaining = self._state.paused_remaining_seconds
+			if remaining is None:
+				remaining = BID_WINDOW_SECONDS
+
+			elapsed = BID_WINDOW_SECONDS - max(0, min(BID_WINDOW_SECONDS, remaining))
+			self._state.player_started_at = datetime.now(timezone.utc) - timedelta(seconds=elapsed)
+			self._state.timer_paused = False
+			self._state.paused_remaining_seconds = None
+			return self.get_state(message="Bid timer resumed")
+
 	def place_bid(self, team_name: str, amount: int) -> AuctionStateOut:
 		with self._lock:
 			normalized_team = team_name.strip().lower()
@@ -227,6 +277,9 @@ class BiddingService:
 
 			if self._state.player is None:
 				raise ValueError("No active player left to bid on")
+
+			if self._state.timer_paused:
+				raise ValueError("Bid timer is paused. Resume timer before placing bid")
 
 			if self._bid_window_closed():
 				raise ValueError(
@@ -260,6 +313,8 @@ class BiddingService:
 			self._state.current_bid = amount
 			self._state.leading_team = team.name
 			self._state.player_started_at = now
+			self._state.timer_paused = False
+			self._state.paused_remaining_seconds = None
 			self._state.recent_bids.insert(
 				0,
 				BidEventOut(

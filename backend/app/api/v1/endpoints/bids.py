@@ -27,3 +27,19 @@ def close_auction() -> CloseAuctionOut:
 @router.post("/reset", response_model=ResetAuctionOut)
 def reset_auction() -> ResetAuctionOut:
 	return ResetAuctionOut(status="ok", state=bidding_service.reset())
+
+
+@router.post("/timer/pause", response_model=AuctionStateOut)
+def pause_auction_timer() -> AuctionStateOut:
+	try:
+		return bidding_service.pause_timer()
+	except ValueError as exc:
+		raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/timer/resume", response_model=AuctionStateOut)
+def resume_auction_timer() -> AuctionStateOut:
+	try:
+		return bidding_service.resume_timer()
+	except ValueError as exc:
+		raise HTTPException(status_code=400, detail=str(exc)) from exc

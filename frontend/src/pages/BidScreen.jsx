@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import BidOptions from "../components/bidding/BidOptions";
 import PlayerCard from "../components/player/PlayerCard";
-import { closeAuction, fetchAuctionState, resetAuction, submitBid } from "../services/bidService";
+import {
+	closeAuction,
+	fetchAuctionState,
+	pauseAuctionTimer,
+	resetAuction,
+	resumeAuctionTimer,
+	submitBid,
+} from "../services/bidService";
 
 function BidScreen() {
 	const [state, setState] = useState(null);
@@ -30,6 +37,10 @@ function BidScreen() {
 			return undefined;
 		}
 
+		if (state.bid_timer_paused) {
+			return undefined;
+		}
+
 		const timerId = window.setInterval(() => {
 			setDisplayRemainingSeconds((previous) => (previous > 0 ? previous - 1 : 0));
 		}, 1000);
@@ -37,7 +48,7 @@ function BidScreen() {
 		return () => {
 			window.clearInterval(timerId);
 		};
-	}, [state?.current_player?.id]);
+	}, [state?.current_player?.id, state?.bid_timer_paused]);
 
 	async function loadState() {
 		setLoading(true);
@@ -105,6 +116,34 @@ function BidScreen() {
 		}
 	}
 
+	async function handlePauseTimer() {
+		setLoading(true);
+		setError("");
+		try {
+			const data = await pauseAuctionTimer();
+			setState(data);
+			setNotice(data.message || "Bid timer paused");
+		} catch (err) {
+			setError(err?.response?.data?.detail || "Failed to pause timer");
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	async function handleResumeTimer() {
+		setLoading(true);
+		setError("");
+		try {
+			const data = await resumeAuctionTimer();
+			setState(data);
+			setNotice(data.message || "Bid timer resumed");
+		} catch (err) {
+			setError(err?.response?.data?.detail || "Failed to resume timer");
+		} finally {
+			setLoading(false);
+		}
+	}
+
 	const summary = useMemo(() => {
 		if (!state) {
 			return "Loading...";
@@ -135,6 +174,10 @@ function BidScreen() {
 		const remainingFormatted = String(remaining).padStart(2, "0");
 		const totalFormatted = String(total).padStart(2, "0");
 
+		if (state.bid_timer_paused) {
+			return `Bid window paused at 00:${remainingFormatted}`;
+		}
+
 		if (remaining === 0) {
 			return "Bid window ended. Close current player to move next.";
 		}
@@ -144,6 +187,7 @@ function BidScreen() {
 
 	const timerCritical = Boolean(
 		state?.current_player &&
+			!state?.bid_timer_paused &&
 			displayRemainingSeconds <= 5,
 	);
 
@@ -158,6 +202,24 @@ function BidScreen() {
 					<p>{summary}</p>
 				</div>
 				<div className="header-actions">
+					{state?.bid_timer_paused ? (
+						<button
+							type="button"
+							onClick={handleResumeTimer}
+							disabled={loading || !hasActivePlayer}
+						>
+							Resume Timer
+						</button>
+					) : (
+						<button
+							type="button"
+							className="ghost"
+							onClick={handlePauseTimer}
+							disabled={loading || !hasActivePlayer}
+						>
+							Pause Timer
+						</button>
+					)}
 					<button type="button" onClick={handleCloseAuction} disabled={loading || !hasActivePlayer}>
 						Close Current Player
 					</button>
@@ -179,7 +241,7 @@ function BidScreen() {
 						minIncrement={state.min_increment}
 						onBid={handleBid}
 						loading={loading}
-						disabled={!hasActivePlayer}
+						disabled={!hasActivePlayer || state.bid_timer_paused}
 						squadMaxPlayers={state.squad_max_players}
 					/>
 				</div>

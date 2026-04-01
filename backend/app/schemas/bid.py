@@ -27,6 +27,7 @@ class AuctionStateOut(BaseModel):
 	bid_window_seconds: int
 	bid_window_remaining_seconds: int | None
 	bid_window_ends_at: str | None
+	bid_timer_paused: bool
 	squad_min_players: int
 	squad_max_players: int
 	bid_options: list[int]

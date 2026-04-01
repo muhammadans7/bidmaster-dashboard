@@ -22,3 +22,13 @@ export async function resetAuction() {
   const response = await apiClient.post("/auction/reset");
   return response.data;
 }
+
+export async function pauseAuctionTimer() {
+  const response = await apiClient.post("/auction/timer/pause");
+  return response.data;
+}
+
+export async function resumeAuctionTimer() {
+  const response = await apiClient.post("/auction/timer/resume");
+  return response.data;
+}
